@@ -1,0 +1,36 @@
+name: Monitor de Alquileres CABA
+
+on:
+  schedule:
+    # Corre cada 15 minutos, las 24 horas del día, 100% gratis en la nube de GitHub
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Permite dispararlo manualmente con un clic en GitHub
+
+jobs:
+  check-alquileres:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Instalar dependencias y ejecutar escaneo
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          uv run python main.py --once
+
+      - name: Guardar historial de propiedades vistas y planilla
+        run: |
+          git config --global user.name "Alquileres Bot"
+          git config --global user.email "bot@alquileres.local"
+          git add seen_ids.txt alquileres.csv config.json
+          git commit -m "Auto-update: nuevas propiedades vistas [skip ci]" || exit 0
+          git push
