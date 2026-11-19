@@ -1,0 +1,16 @@
+name: Test Scraping
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Argenprop and ML with curl and python
+        run: |
+          echo "--- Testing direct Argenprop URL ---"
+          curl -s -I -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" "https://www.argenprop.com/ph/alquiler/capital-federal/pesos-hasta-1200000" | head -n 10
+
+          echo "--- Testing ML with curl ---"
+          curl -s -I -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" "https://inmuebles.mercadolibre.com.ar/ph/alquiler/capital-federal/_PriceRange_0ARS-1200000ARS" | head -n 10
