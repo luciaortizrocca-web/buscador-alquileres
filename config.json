@@ -32,7 +32,11 @@
     "boedo",
     "coghlan"
   ],
-  "property_types": ["ph", "casas", "departamentos"],
+  "property_types": [
+    "ph",
+    "casas",
+    "departamentos"
+  ],
   "require_outdoor_space": true,
   "min_environments": 2,
   "check_interval_seconds": 600,
