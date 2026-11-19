@@ -2,9 +2,9 @@ name: Monitor de Alquileres CABA
 
 on:
   schedule:
-    # Corre cada 15 minutos, las 24 horas del día, 100% gratis en la nube de GitHub
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # Permite dispararlo manualmente con un clic en GitHub
+    # Corre cada 30 minutos, las 24 horas del día, en la nube con ScraperAPI
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Permite dispararlo manualmente
 
 jobs:
   check-alquileres:
@@ -24,6 +24,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SCRAPER_API_KEY: ${{ secrets.SCRAPER_API_KEY }}
         run: |
           uv run python main.py --once
 

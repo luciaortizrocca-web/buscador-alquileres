@@ -32,6 +32,8 @@ def cargar_config() -> dict:
         config["telegram_bot_token"] = os.environ["TELEGRAM_BOT_TOKEN"]
     if os.environ.get("TELEGRAM_CHAT_ID"):
         config["telegram_chat_id"] = os.environ["TELEGRAM_CHAT_ID"]
+    if os.environ.get("SCRAPER_API_KEY"):
+        config["scraper_api_key"] = os.environ["SCRAPER_API_KEY"]
     return config
 
 def ejecutar_ciclo_busqueda(config: dict) -> int:
@@ -45,10 +47,11 @@ def ejecutar_ciclo_busqueda(config: dict) -> int:
     token = config.get("telegram_bot_token", "")
     chat_id = config.get("telegram_chat_id", "")
     sheet_webhook = config.get("google_sheet_webhook_url", "")
+    scraper_api_key = config.get("scraper_api_key", "")
     
     todas_encontradas = []
     
-    with httpx.Client(timeout=15.0) as client:
+    with httpx.Client(timeout=40.0) as client:
         # 1. Mercado Libre
         tipos_ml = []
         if "ph" in config.get("property_types", []):
@@ -60,7 +63,7 @@ def ejecutar_ciclo_busqueda(config: dict) -> int:
             
         for t in tipos_ml:
             logger.info(f"Buscando en Mercado Libre: {t} (hasta ${max_price:,} ARS)")
-            props_ml = buscar_mercadolibre(t, max_price, client)
+            props_ml = buscar_mercadolibre(t, max_price, client, scraper_api_key)
             todas_encontradas.extend(props_ml)
             
         # 2. Argenprop
@@ -74,7 +77,7 @@ def ejecutar_ciclo_busqueda(config: dict) -> int:
             
         for t in tipos_arg:
             logger.info(f"Buscando en Argenprop: {t} (hasta ${max_price:,} ARS)")
-            props_arg = buscar_argenprop(t, max_price, client)
+            props_arg = buscar_argenprop(t, max_price, client, scraper_api_key)
             todas_encontradas.extend(props_arg)
 
     logger.info(f"Total avisos recolectados en crudo: {len(todas_encontradas)}")

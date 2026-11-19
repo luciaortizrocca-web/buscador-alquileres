@@ -1,6 +1,7 @@
 import re
 import logging
-from typing import List
+import urllib.parse
+from typing import List, Optional
 import httpx
 from bs4 import BeautifulSoup
 from models import Propiedad
@@ -12,9 +13,6 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "es-ES,es;q=0.9",
     "Referer": "https://inmuebles.mercadolibre.com.ar/",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "same-site",
 }
 
 def detectar_exterior(texto: str) -> tuple[bool, str]:
@@ -33,50 +31,23 @@ def detectar_exterior(texto: str) -> tuple[bool, str]:
         return True, ", ".join(hallazgos)
     return False, ""
 
-def obtener_detalle_ml(client: httpx.Client, url: str) -> dict:
-    """Extrae expensas y texto de descripción detallada si es necesario."""
-    detalle = {"expensas": 0, "descripcion": "", "ambientes": "", "m2": ""}
-    try:
-        resp = client.get(url, headers=HEADERS, timeout=10.0, follow_redirects=True)
-        if resp.status_code != 200:
-            return detalle
-        soup = BeautifulSoup(resp.text, "html.parser")
-        
-        # Descripción
-        desc_elem = soup.select_one(".ui-pdp-description__content")
-        if desc_elem:
-            detalle["descripcion"] = desc_elem.get_text(" ", strip=True)
-            
-        # Tabla de características
-        for row in soup.select(".andes-table__row, .ui-pdp-specs__table tr"):
-            th = row.select_one("th")
-            td = row.select_one("td")
-            if not th or not td:
-                continue
-            clave = th.get_text(strip=True).lower()
-            valor = td.get_text(strip=True)
-            if "expensas" in clave:
-                num = re.sub(r"[^\d]", "", valor)
-                if num:
-                    detalle["expensas"] = int(num)
-            elif "ambientes" in clave:
-                detalle["ambientes"] = valor
-            elif "superficie total" in clave or "superficie cubierta" in clave:
-                if not detalle["m2"]:
-                    detalle["m2"] = valor
-    except Exception as e:
-        logger.debug(f"Error consultando detalle ML {url}: {e}")
-    return detalle
-
-def buscar_mercadolibre(tipo_cat: str, max_price: int, client: httpx.Client) -> List[Propiedad]:
+def buscar_mercadolibre(tipo_cat: str, max_price: int, client: httpx.Client, scraper_api_key: str = "") -> List[Propiedad]:
     """
     tipo_cat: 'ph', 'casas', 'departamentos'
     """
-    url = f"https://inmuebles.mercadolibre.com.ar/{tipo_cat}/alquiler/capital-federal/_PriceRange_0ARS-{max_price}ARS"
+    raw_url = f"https://inmuebles.mercadolibre.com.ar/{tipo_cat}/alquiler/capital-federal/_PriceRange_0ARS-{max_price}ARS"
+    
+    if scraper_api_key:
+        req_url = f"http://api.scraperapi.com?api_key={scraper_api_key}&url={urllib.parse.quote(raw_url)}&country_code=ar"
+        req_headers = {}
+    else:
+        req_url = raw_url
+        req_headers = HEADERS
+
     propiedades = []
     
     try:
-        resp = client.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+        resp = client.get(req_url, headers=req_headers, timeout=35.0, follow_redirects=True)
         if resp.status_code != 200:
             logger.warning(f"ML respondió con status {resp.status_code} para {tipo_cat}")
             return propiedades
@@ -140,25 +111,14 @@ def buscar_mercadolibre(tipo_cat: str, max_price: int, client: httpx.Client) -> 
                 elif "m²" in t.lower() or "m2" in t.lower():
                     m2 = t
                     
-            # Detección inicial de exterior en el texto de la tarjeta o título
+            # Detección de exterior en la tarjeta o título
             tiene_ext, det_ext = detectar_exterior(card_all_text + " " + titulo)
             expensas = 0
             
-            # Si no se detectó exterior en la tarjeta, pero es un PH o casa o depto prometedor, consultamos el detalle
-            if not tiene_ext:
-                det = obtener_detalle_ml(client, url_item)
-                if det["descripcion"]:
-                    tiene_ext, det_ext = detectar_exterior(det["descripcion"])
-                if det["expensas"] > 0:
-                    expensas = det["expensas"]
-                if not ambientes and det["ambientes"]:
-                    ambientes = det["ambientes"]
-                if not m2 and det["m2"]:
-                    m2 = det["m2"]
-            else:
-                match_exp = re.search(r"expensas[:\s]+\$?\s*([\d\.]+)", card_all_text, re.IGNORECASE)
-                if match_exp:
-                    expensas = int(match_exp.group(1).replace(".", ""))
+            # Buscar mención de expensas en el texto de la tarjeta
+            match_exp = re.search(r"expensas[:\s]+\$?\s*([\d\.]+)", card_all_text, re.IGNORECASE)
+            if match_exp:
+                expensas = int(match_exp.group(1).replace(".", ""))
                     
             tipo_nombre = "PH" if tipo_cat == "ph" else ("Casa" if tipo_cat == "casas" else "Departamento")
             

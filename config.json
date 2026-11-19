@@ -39,8 +39,9 @@
   ],
   "require_outdoor_space": true,
   "min_environments": 2,
-  "check_interval_seconds": 600,
+  "check_interval_seconds": 1800,
   "telegram_bot_token": "9252982234:AAHTrtuCX5Q8jdVoNq12L1R4Akz4aby4PEI",
   "telegram_chat_id": "258392277",
+  "scraper_api_key": "ddc89c44938676afad7a31b9b3b740ca",
   "google_sheet_webhook_url": ""
 }

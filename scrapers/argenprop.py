@@ -1,5 +1,6 @@
 import re
 import logging
+import urllib.parse
 from typing import List
 import httpx
 from bs4 import BeautifulSoup
@@ -8,7 +9,8 @@ from models import Propiedad
 logger = logging.getLogger("scrapers.argenprop")
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "es-ES,es;q=0.9",
 }
 
@@ -28,15 +30,24 @@ def detectar_exterior(texto: str) -> tuple[bool, str]:
         return True, ", ".join(hallazgos)
     return False, ""
 
-def buscar_argenprop(tipo_cat: str, max_price: int, client: httpx.Client) -> List[Propiedad]:
+def buscar_argenprop(tipo_cat: str, max_price: int, client: httpx.Client, scraper_api_key: str = "") -> List[Propiedad]:
     """
-    tipo_cat: 'ph', 'departamento', 'casa'
+    tipo_cat: 'ph', 'departamentos', 'casas'
     """
-    url = f"https://www.argenprop.com/{tipo_cat}-alquiler-localidad-capital-federal-hasta-{max_price}-pesos"
+    plural = "departamentos" if tipo_cat in ["departamento", "departamentos"] else ("casas" if tipo_cat in ["casa", "casas"] else "ph")
+    raw_url = f"https://www.argenprop.com/{plural}/alquiler/capital-federal/pesos-hasta-{max_price}"
+    
+    if scraper_api_key:
+        req_url = f"http://api.scraperapi.com?api_key={scraper_api_key}&url={urllib.parse.quote(raw_url)}&country_code=ar"
+        req_headers = {}
+    else:
+        req_url = raw_url
+        req_headers = HEADERS
+
     propiedades = []
     
     try:
-        resp = client.get(url, headers=HEADERS, timeout=15.0, follow_redirects=True)
+        resp = client.get(req_url, headers=req_headers, timeout=35.0, follow_redirects=True)
         if resp.status_code != 200:
             logger.warning(f"Argenprop respondió con status {resp.status_code} para {tipo_cat}")
             return propiedades
@@ -113,7 +124,7 @@ def buscar_argenprop(tipo_cat: str, max_price: int, client: httpx.Client) -> Lis
                     
             tiene_ext, det_ext = detectar_exterior(card_all_text)
             
-            tipo_nombre = "PH" if tipo_cat == "ph" else ("Casa" if tipo_cat == "casa" else "Departamento")
+            tipo_nombre = "PH" if tipo_cat in ["ph"] else ("Casa" if tipo_cat in ["casa", "casas"] else "Departamento")
             
             p = Propiedad(
                 id=f"ARG_{item_id}",
